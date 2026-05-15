@@ -371,7 +371,7 @@ function DeliveryForm({ onSuccess, onCancel }) {
 
   if (savedFolio) {
 return (
-  <div key="success-message" className="bg-white border border-stone-200
+  <div key="success-message" className="bg-white border border-stone-200 rounded-2xl p-8 sm:p-12 text-center">
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 text-green-700 mb-4">
           <Check size={32} strokeWidth={3} />
         </div>
