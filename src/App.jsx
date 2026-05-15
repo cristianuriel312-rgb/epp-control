@@ -46,48 +46,49 @@ body,#root{font-family:'Outfit',ui-sans-serif,sans-serif}
 }
 `;
 
-// ============================================================================
-// CAPA DE DATOS (localStorage)
-// ============================================================================
+// ============================================================
+// CAPA DE DATOS (Google Sheets)
+// ============================================================
+
+const API_URL = 'https://script.google.com/macros/s/AKfycbyZdQb_QLicuaviucB2s8oWz2t0MaSXjJvY2jHxsfvcAhh0HovCFNSGIHN9ptOziK1wIw/exec';
 
 const db = {
   async getIndex() {
     try {
-      const raw = localStorage.getItem('epp:index');
-      return raw ? JSON.parse(raw) : [];
+      const res = await fetch(`${API_URL}?action=getAll`);
+      const data = await res.json();
+      return data.deliveries || [];
     } catch { return []; }
   },
-  async _setIndex(arr) {
-    localStorage.setItem('epp:index', JSON.stringify(arr));
-  },
-  async getSignature(folio) {
-    return localStorage.getItem(`epp:sig:${folio}`);
-  },
-  async _setSignature(folio, dataUrl) {
-    localStorage.setItem(`epp:sig:${folio}`, dataUrl);
-  },
-  async _deleteSignature(folio) {
-    localStorage.removeItem(`epp:sig:${folio}`);
-  },
   async saveDelivery({ signature, ...delivery }) {
-    const idx = await this.getIndex();
-    idx.push(delivery);
-    await this._setIndex(idx);
-    if (signature) await this._setSignature(delivery.folio, signature);
-    return delivery;
+    try {
+      await fetch(API_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'save', delivery, signature })
+      });
+      return delivery;
+    } catch (e) { throw e; }
   },
   async deleteDelivery(folio) {
-    const idx = await this.getIndex();
-    await this._setIndex(idx.filter(d => d.folio !== folio));
-    await this._deleteSignature(folio);
+    try {
+      await fetch(API_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'delete', folio })
+      });
+    } catch (e) { throw e; }
+  },
+  async getSignature(folio) {
+    try {
+      const res = await fetch(`${API_URL}?action=getSignature&folio=${folio}`);
+      const data = await res.json();
+      return data.url || null;
+    } catch { return null; }
   },
   async nextFolio() {
     const idx = await this.getIndex();
     const year = new Date().getFullYear();
-    const max = idx
-      .filter(d => d.folio.startsWith(`EPP-${year}-`))
-      .reduce((m, d) => Math.max(m, parseInt(d.folio.split('-')[2], 10) || 0), 0);
-    return `EPP-${year}-${String(max + 1).padStart(4, '0')}`;
+    const n = (idx.length + 1).toString().padStart(4, '0');
+    return `EPP-${year}-${n}`;
   }
 };
 
