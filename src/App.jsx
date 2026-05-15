@@ -57,7 +57,7 @@ const db = {
     try {
       const res = await fetch(`${API_URL}?action=getAll`);
       const data = await res.json();
-      return data.deliveries || [];
+      return data.entregas || [];
     } catch { return []; }
   },
   async saveDelivery({ signature, ...delivery }) {
