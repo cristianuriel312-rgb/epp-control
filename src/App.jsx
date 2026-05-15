@@ -370,8 +370,8 @@ function DeliveryForm({ onSuccess, onCancel }) {
   };
 
   if (savedFolio) {
-    return (
-      <div className="bg-white border border-stone-200 rounded-2xl p-8 sm:p-12 text-center">
+return (
+  <div key="success-message" className="bg-white border border-stone-200
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 text-green-700 mb-4">
           <Check size={32} strokeWidth={3} />
         </div>
@@ -382,8 +382,8 @@ function DeliveryForm({ onSuccess, onCancel }) {
     );
   }
 
-  return (
-    <div className="space-y-6">
+return (
+  <div key="form-fields" className="space-y-6">
       {/* Header */}
       <div className="bg-stone-950 text-white rounded-2xl p-5 sm:p-6 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-400 opacity-10 rounded-full -mr-12 -mt-12" />
@@ -1259,7 +1259,7 @@ function HomeView({ deliveries, onNavigate }) {
             <HardHat size={20} className="text-yellow-400" />
             <span className="text-[10px] uppercase tracking-widest font-bold text-yellow-400">Seguridad y Salud en el Trabajo</span>
           </div>
-          <h1 className="font-display text-3xl sm:text-5xl font-bold leading-tight mb-2">Control de entrega<br />de EPP</h1>
+          <h1 className="font-display text-3xl sm:text-5xl font-bold leading-tight mb-2 text-white">Control de entrega<br />de EPP</h1>
           <p className="text-stone-300 max-w-md text-sm sm:text-base">Registra, almacena y da seguimiento a la entrega de equipo de protección personal con firma digital y evidencia auditable.</p>
           <button
             onClick={() => onNavigate('new')}
