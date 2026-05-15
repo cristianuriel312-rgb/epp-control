@@ -55,32 +55,42 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbyZdQb_QLicuaviucB2s8oW
 const db = {
   async getIndex() {
     try {
-      const res = await fetch(`${API_URL}?action=getAll`);
-      const data = await res.json();
+      const res = await fetch(`${API_URL}?action=getAll`, {
+        method: 'GET',
+        redirect: 'follow',
+      });
+      const text = await res.text();
+      const data = JSON.parse(text);
       return data.entregas || [];
-    } catch { return []; }
+    } catch(e) { console.error('getIndex error:', e); return []; }
   },
   async saveDelivery({ signature, ...delivery }) {
     try {
-      await fetch(API_URL, {
+      const res = await fetch(API_URL, {
         method: 'POST',
+        redirect: 'follow',
         body: JSON.stringify({ action: 'save', delivery, signature })
       });
-      return delivery;
-    } catch (e) { throw e; }
+      const text = await res.text();
+      return JSON.parse(text);
+    } catch(e) { throw e; }
   },
   async deleteDelivery(folio) {
     try {
       await fetch(API_URL, {
         method: 'POST',
+        redirect: 'follow',
         body: JSON.stringify({ action: 'delete', folio })
       });
-    } catch (e) { throw e; }
+    } catch(e) { throw e; }
   },
   async getSignature(folio) {
     try {
-      const res = await fetch(`${API_URL}?action=getSignature&folio=${folio}`);
-      const data = await res.json();
+      const res = await fetch(`${API_URL}?action=getSignature&folio=${folio}`, {
+        redirect: 'follow',
+      });
+      const text = await res.text();
+      const data = JSON.parse(text);
       return data.url || null;
     } catch { return null; }
   },
@@ -1346,7 +1356,7 @@ export default function App() {
 
   return (
     <>
-      <style>{FONT_CSS}</style>
+
       <div className="min-h-screen bg-stone-100 font-body text-stone-900">
         <header className="bg-stone-950 text-white sticky top-0 z-30 no-print">
           <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
