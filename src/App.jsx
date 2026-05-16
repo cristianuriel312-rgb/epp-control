@@ -44,6 +44,11 @@ body,#root{font-family:'Outfit',ui-sans-serif,sans-serif}
   .print-page{padding:2rem;background:white !important}
   body{background:white !important}
 }
+@keyframes slide-up{
+  from{opacity:0;transform:translate(-50%, 20px)}
+  to{opacity:1;transform:translate(-50%, 0)}
+}
+.animate-slide-up{animation:slide-up 0.3s ease-out}
 `;
 
 // ============================================================
@@ -75,13 +80,16 @@ const db = {
       return JSON.parse(text);
     } catch(e) { throw e; }
   },
-  async deleteDelivery(folio) {
+async deleteDelivery(folio) {
     try {
-      await fetch(API_URL, {
+      const folios = Array.isArray(folio) ? folio : [folio];
+      const res = await fetch(API_URL, {
         method: 'POST',
         redirect: 'follow',
-        body: JSON.stringify({ action: 'delete', folio })
+        body: JSON.stringify({ action: 'delete', folio: folios })
       });
+      const text = await res.text();
+      return JSON.parse(text);
     } catch(e) { throw e; }
   },
   async getSignature(folio) {
@@ -734,11 +742,13 @@ const DetailGrid = ({ title, rows }) => (
 // HISTORIAL
 // ============================================================================
 
-function HistoryView({ deliveries, onView }) {
+function HistoryView({ deliveries, onView, onDeleteMultiple }) {
   const [filters, setFilters] = useState({
     q: '', fechaIni: '', fechaFin: '', area: '', empleado: '', numero: '', epp: '', motivo: '', entrega: ''
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [selected, setSelected] = useState([]);
+  const [confirmDeleteMultiple, setConfirmDeleteMultiple] = useState(false);
 
   const filtered = useMemo(() => {
     return deliveries.filter(d => {
@@ -756,10 +766,36 @@ function HistoryView({ deliveries, onView }) {
     }).sort((a, b) => b.fecha_registro.localeCompare(a.fecha_registro));
   }, [deliveries, filters]);
 
-  const reset = () => setFilters({ q: '', fechaIni: '', fechaFin: '', area: '', empleado: '', numero: '', epp: '', motivo: '', entrega: '' });
-  const activeFilters = Object.values(filters).filter(v => v).length;
+  const reset = () => {
+    setFilters({ q: '', fechaIni: '', fechaFin: '', area: '', empleado: '', numero: '', epp: '', motivo: '', entrega: '' });
+    setSelected([]);
+  };
 
+  const activeFilters = Object.values(filters).filter(v => v).length;
   const exportFiltered = () => exportToExcel(filtered, 'entregas_filtradas');
+
+  const toggleSelect = (folio) => {
+    setSelected(prev => 
+      prev.includes(folio) ? prev.filter(f => f !== folio) : [...prev, folio]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selected.length === filtered.length) {
+      setSelected([]);
+    } else {
+      setSelected(filtered.map(d => d.folio));
+    }
+  };
+
+  const handleDeleteMultiple = async () => {
+    await onDeleteMultiple(selected);
+    setSelected([]);
+    setConfirmDeleteMultiple(false);
+  };
+
+  const isAllSelected = filtered.length > 0 && selected.length === filtered.length;
+  const isSomeSelected = selected.length > 0 && selected.length < filtered.length;
 
   return (
     <div className="space-y-4">
@@ -850,6 +886,19 @@ function HistoryView({ deliveries, onView }) {
             <table className="w-full text-sm">
               <thead className="bg-stone-50 border-b border-stone-200">
                 <tr>
+                  <th className="text-left px-4 py-3 w-12">
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isAllSelected}
+                        ref={input => {
+                          if (input) input.indeterminate = isSomeSelected;
+                        }}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 rounded border-stone-300 text-stone-900 focus:ring-yellow-400 cursor-pointer"
+                      />
+                    </label>
+                  </th>
                   {['Folio', 'Fecha', 'Empleado', 'N°', 'Área', 'EPP', 'Motivo', ''].map(h => (
                     <th key={h} className="text-left px-4 py-3 text-[10px] uppercase tracking-widest font-bold text-stone-600">{h}</th>
                   ))}
@@ -857,43 +906,114 @@ function HistoryView({ deliveries, onView }) {
               </thead>
               <tbody className="divide-y divide-stone-100">
                 {filtered.map(d => (
-                  <tr key={d.folio} className="hover:bg-stone-50 cursor-pointer transition" onClick={() => onView(d)}>
-                    <td className="px-4 py-3 font-mono text-xs font-semibold text-stone-900">{d.folio}</td>
-                    <td className="px-4 py-3 text-stone-700">{fmtDate(d.fecha_entrega)}</td>
-                    <td className="px-4 py-3 text-stone-900 font-medium">{d.empleado_nombre}</td>
-                    <td className="px-4 py-3 text-stone-500 font-mono text-xs">{d.empleado_numero}</td>
-                    <td className="px-4 py-3 text-stone-700">{d.area}</td>
-                    <td className="px-4 py-3 text-stone-600">
+                  <tr 
+                    key={d.folio} 
+                    className={`hover:bg-stone-50 transition ${selected.includes(d.folio) ? 'bg-yellow-50' : ''}`}
+                  >
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(d.folio)}
+                        onChange={() => toggleSelect(d.folio)}
+                        className="w-4 h-4 rounded border-stone-300 text-stone-900 focus:ring-yellow-400 cursor-pointer"
+                        onClick={e => e.stopPropagation()}
+                      />
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs font-semibold text-stone-900 cursor-pointer" onClick={() => onView(d)}>{d.folio}</td>
+                    <td className="px-4 py-3 text-stone-700 cursor-pointer" onClick={() => onView(d)}>{fmtDate(d.fecha_entrega)}</td>
+                    <td className="px-4 py-3 text-stone-900 font-medium cursor-pointer" onClick={() => onView(d)}>{d.empleado_nombre}</td>
+                    <td className="px-4 py-3 text-stone-500 font-mono text-xs cursor-pointer" onClick={() => onView(d)}>{d.empleado_numero}</td>
+                    <td className="px-4 py-3 text-stone-700 cursor-pointer" onClick={() => onView(d)}>{d.area}</td>
+                    <td className="px-4 py-3 text-stone-600 cursor-pointer" onClick={() => onView(d)}>
                       <span className="inline-block bg-stone-100 text-stone-700 px-2 py-0.5 rounded text-xs font-medium">{d.epp.length} pieza{d.epp.length !== 1 ? 's' : ''}</span>
                     </td>
-                    <td className="px-4 py-3 text-stone-600 text-xs">{d.motivo}</td>
+                    <td className="px-4 py-3 text-stone-600 text-xs cursor-pointer" onClick={() => onView(d)}>{d.motivo}</td>
                     <td className="px-4 py-3 text-right">
-                      <Eye size={16} className="text-stone-400 inline" />
+                      <button onClick={() => onView(d)} className="p-1 hover:bg-stone-100 rounded transition">
+                        <Eye size={16} className="text-stone-400" />
+                      </button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+
           <div className="md:hidden divide-y divide-stone-100">
             {filtered.map(d => (
-              <button
+              <div
                 key={d.folio}
-                onClick={() => onView(d)}
-                className="w-full px-4 py-3.5 hover:bg-stone-50 active:bg-stone-100 text-left transition"
+                className={`px-4 py-3.5 ${selected.includes(d.folio) ? 'bg-yellow-50' : 'hover:bg-stone-50'} active:bg-stone-100 transition`}
               >
-                <div className="flex items-start justify-between gap-3 mb-1">
-                  <div className="font-mono text-xs font-bold text-stone-900">{d.folio}</div>
-                  <div className="text-xs text-stone-500">{fmtDate(d.fecha_entrega)}</div>
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(d.folio)}
+                    onChange={() => toggleSelect(d.folio)}
+                    className="w-4 h-4 rounded border-stone-300 text-stone-900 focus:ring-yellow-400 cursor-pointer mt-1"
+                  />
+                  <button onClick={() => onView(d)} className="flex-1 text-left">
+                    <div className="flex items-start justify-between gap-3 mb-1">
+                      <div className="font-mono text-xs font-bold text-stone-900">{d.folio}</div>
+                      <div className="text-xs text-stone-500">{fmtDate(d.fecha_entrega)}</div>
+                    </div>
+                    <div className="font-semibold text-stone-900">{d.empleado_nombre}</div>
+                    <div className="text-xs text-stone-500 mt-0.5">{d.area} · {d.empleado_numero}</div>
+                    <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                      <span className="bg-stone-100 text-stone-700 px-2 py-0.5 rounded text-[10px] font-semibold">{d.epp.length} EPP</span>
+                      <span className="text-[10px] text-stone-500">· {d.motivo}</span>
+                    </div>
+                  </button>
                 </div>
-                <div className="font-semibold text-stone-900">{d.empleado_nombre}</div>
-                <div className="text-xs text-stone-500 mt-0.5">{d.area} · {d.empleado_numero}</div>
-                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                  <span className="bg-stone-100 text-stone-700 px-2 py-0.5 rounded text-[10px] font-semibold">{d.epp.length} EPP</span>
-                  <span className="text-[10px] text-stone-500">· {d.motivo}</span>
-                </div>
-              </button>
+              </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {selected.length > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 animate-slide-up">
+          <div className="bg-stone-950 text-white rounded-2xl shadow-2xl border border-stone-800 p-4 flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-yellow-400 text-stone-950 flex items-center justify-center font-bold text-sm">
+                {selected.length}
+              </div>
+              <span className="text-sm font-semibold">
+                {selected.length} {selected.length === 1 ? 'registro seleccionado' : 'registros seleccionados'}
+              </span>
+            </div>
+            
+            {confirmDeleteMultiple ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setConfirmDeleteMultiple(false)}
+                  className="px-4 py-2 rounded-lg bg-stone-800 hover:bg-stone-700 text-white font-semibold text-sm transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleDeleteMultiple}
+                  className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold text-sm transition flex items-center gap-1.5"
+                >
+                  <Trash2 size={14} /> Confirmar eliminación
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSelected([])}
+                  className="px-3 py-2 rounded-lg bg-stone-800 hover:bg-stone-700 text-white font-semibold text-sm transition"
+                >
+                  Limpiar
+                </button>
+                <button
+                  onClick={() => setConfirmDeleteMultiple(true)}
+                  className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold text-sm transition flex items-center gap-1.5"
+                >
+                  <Trash2 size={14} /> Eliminar seleccionados
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1346,6 +1466,12 @@ export default function App() {
     await refresh();
   };
 
+  const handleDeleteMultiple = async (folios) => {
+    if (folios.length === 0) return;
+    await db.deleteDelivery(folios);
+    await refresh();
+  };
+
   const tabs = [
     { id: 'home', label: 'Inicio', icon: Home },
     { id: 'new', label: 'Nueva entrega', icon: Plus },
@@ -1409,7 +1535,7 @@ export default function App() {
             <>
               {tab === 'home' && <HomeView deliveries={deliveries} onNavigate={setTab} />}
               {tab === 'new' && <DeliveryForm onSuccess={handleSaveSuccess} onCancel={() => setTab('home')} />}
-              {tab === 'history' && <HistoryView deliveries={deliveries} onView={setDetail} />}
+              {tab === 'history' && <HistoryView deliveries={deliveries} onView={setDetail} onDeleteMultiple={handleDeleteMultiple} />}
               {tab === 'dashboard' && <Dashboard deliveries={deliveries} />}
               {tab === 'export' && <ExportView deliveries={deliveries} />}
             </>
